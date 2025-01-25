@@ -8,68 +8,65 @@ namespace Publisher
         private static string _connectionString = "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
         static async Task Main(string[] args)
         {
-            await PublishMessageToQueue();
-            await PublishMessageToTopic();
+            string messageType = string.Empty;
+            do
+            {
+                Console.WriteLine("Do you want to publish messages to a queue or a topic? (queue/topic), Enter quit or exit to close: ");
+                messageType = Console.ReadLine();
+                string message = string.Empty;
+                switch (messageType)
+                {
+                    case "queue":
+                        Console.WriteLine("Enter the queue name to publish messages: ");
+                        string queueName = Console.ReadLine();
+                        Console.WriteLine("Enter the message: ");
+                        message = Console.ReadLine();
+                        await PublishMessageToQueue(queueName, message);
+                        break;
+                    case "topic":
+                        Console.WriteLine("Enter the topic name to publish messages: ");
+                        string topicName = Console.ReadLine();
+                        Console.WriteLine("Enter the message: ");
+                        message = Console.ReadLine();
+                        await PublishMessageToTopic(topicName, message);
+                        break;
+                    default:
+                        Console.WriteLine("Invalid input. Please enter queue or topic.");
+                        break;
+                }
+            } while (messageType.ToLower() != "quit" || messageType.ToLower() != "exit");
         }
 
-        private static async Task PublishMessageToQueue()
+        private static async Task PublishMessageToQueue(string queueName, string message)
         {
-            const int numOfMessagesPerBatch = 10;
-            const int numOfBatches = 10;
-
-            string queueName = "queue.1";
-
             var client = new ServiceBusClient(_connectionString);
             var sender = client.CreateSender(queueName);
 
-            for (int i = 1; i <= numOfBatches; i++)
-            {
-                using ServiceBusMessageBatch messageBatch = await sender.CreateMessageBatchAsync();
-
-                for (int j = 1; j <= numOfMessagesPerBatch; j++)
-                {
-                    messageBatch.TryAddMessage(new ServiceBusMessage($"Batch:{i}:Message:{j}, sample message"));
-                }
-                await sender.SendMessagesAsync(messageBatch);
-            }
+            await sender.SendMessageAsync(new ServiceBusMessage(Encoding.UTF8.GetBytes(message)));
 
             await sender.DisposeAsync();
             await client.DisposeAsync();
 
-            Console.WriteLine($"{numOfBatches} batches with {numOfMessagesPerBatch} messages per batch has been published to the queue.");
         }
 
-        private static async Task PublishMessageToTopic()
+        private static async Task PublishMessageToTopic(string topicName, string message)
         {
-            var topicName = "topic.1";
-
             await using (var client = new ServiceBusClient(_connectionString))
             {
                 ServiceBusSender sender = client.CreateSender(topicName);
-
-                //First 50 message will goto Subscription 1 and Subscription 3 as per set filters in Config.json
-                for (int i = 1; i <= 50; i++)
+                await sender.SendMessageAsync(new ServiceBusMessage(Encoding.UTF8.GetBytes($"Message for Subscription 1, 3 : {message}"))
                 {
-                    ServiceBusMessage message = new ServiceBusMessage(Encoding.UTF8.GetBytes($"Message number : {i}"))
-                    {
-                        ContentType = "application/json"
-                    };
-
-                    await sender.SendMessageAsync(message);
-                }
-
-                //Next 50 message will goto Subscription 2 and Subscription 3 as per set filters  in Config.json
+                    ContentType = "application/json"
+                });
 
                 for (int i = 51; i <= 100; i++)
                 {
-                    ServiceBusMessage message = new ServiceBusMessage(Encoding.UTF8.GetBytes($"Message number : {i}"));
-                    message.ApplicationProperties.Add("prop1", "value1");
+                    ServiceBusMessage sbMessage = new ServiceBusMessage(Encoding.UTF8.GetBytes($"Message for Subscription 2, 3 : {message}"));
+                    sbMessage.ApplicationProperties.Add("prop1", "value1");
 
-                    await sender.SendMessageAsync(message);
+                    await sender.SendMessageAsync(sbMessage);
                 }
             }
-
-            Console.WriteLine("Sent 100 messages to the topic.");
         }
     }
 }

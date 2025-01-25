@@ -9,16 +9,20 @@ namespace Consumer
 
         static async Task Main(string[] args)
         {
-            await ConsumeQueue();
-            await ConsumeTopic();
+            var queueTask = ConsumeQueue();
+            var topicTask = ConsumeTopic();
+
+            await Task.WhenAll(queueTask, topicTask);
         }
 
         private static async Task ConsumeTopic()
         {
             var topicName = "topic.1";
-            await ConsumeMessageFromSubscription(topicName, "subscription.1");
-            await ConsumeMessageFromSubscription(topicName, "subscription.2");
-            await ConsumeMessageFromSubscription(topicName, "subscription.3");
+            var subscriptions = new List<string> { "subscription.1", "subscription.2", "subscription.3" };
+
+            var tasks = subscriptions.Select(subscription => ConsumeMessageFromSubscription(topicName, subscription));
+
+            await Task.WhenAll(tasks);
         }
 
         private static async Task ConsumeMessageFromSubscription(string topicName, string subscriptionName)
@@ -35,11 +39,11 @@ namespace Consumer
 
             await processor1.StartProcessingAsync();
 
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            //await Task.Delay(TimeSpan.FromSeconds(5));
 
-            await processor1.StopProcessingAsync();
-            await processor1.DisposeAsync();
-            await client1.DisposeAsync();
+            //await processor1.StopProcessingAsync();
+            //await processor1.DisposeAsync();
+            //await client1.DisposeAsync();
             Console.WriteLine($"Rcv_Sub {subscriptionName} End");
         }
 
@@ -81,7 +85,6 @@ namespace Consumer
                 else
                 {
                     Console.WriteLine("No messages received.");
-                    break;
                 }
             }
 
